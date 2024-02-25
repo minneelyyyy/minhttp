@@ -1,3 +1,5 @@
 .vscode/
+.cache/
 *.o
+compile_commands.json
 webserver

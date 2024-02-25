@@ -1,6 +1,9 @@
 #define _XOPEN_SOURCE 500
 
+#include <config.h>
+
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 
@@ -8,45 +11,71 @@
 #include <netinet/in.h>
 #include <unistd.h>
 
-#include "minhttp.h"
+extern int server_start(struct config *cfg, int socket);
 
-#include <config.h>
+static void daemonize(void) {
+	pid_t pid = fork();
 
-int main(void) {
-	int fd;
-	int opt = 1;
-	int ret;
-	struct sockaddr_in address;
+	if (pid < 0) {
+		fprintf(stderr, "error: failed to daemonize: %s\n",
+			strerror(errno));
+		exit(1);
+	}
 
-	fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (pid)
+		exit(0);
+}
 
-	if (fd < 0) {
-		fprintf(stderr, "error: failed to create socket: %s\n", strerror(errno));
+int main(int argc, char **argv) {
+	char errbuf[512];
+	char *config_path = NULL;
+	struct config *configs = NULL;
+	size_t config_nr;
+	pid_t pid;
+	int c;
+	int is_daemon = 0;
+
+	while ((c = getopt(argc, argv, "dC:")) != -1) {
+		switch (c) {
+			case 'C':
+				config_path = strdup(optarg);
+				break;
+			case 'd':
+				if (!is_daemon) {
+					daemonize();
+					is_daemon = 1;
+				}
+				break;
+		}
+	}
+
+	configs = parse_config(
+		config_path ? config_path : "config.toml",
+		&config_nr, errbuf, sizeof(errbuf));
+
+	free(config_path);
+
+	if (!configs) {
+		fprintf(stderr, "error: failed to parse config: %s\n", errbuf);
 		return 1;
 	}
 
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
-		fprintf(stderr, "error: failed to set socket options: %s\n", strerror(errno));
-		return 1;
+	for (size_t i = 0; i < config_nr; i++) {
+		struct config *cfg = &configs[i];
+
+		pid = fork();
+
+		if (pid == -1) {
+			fprintf(stderr, "error: failed to fork process: %s\n",
+				strerror(errno));
+			return 1;
+		}
+
+		if (!pid)
+			return server_start(cfg);
 	}
 
-	address.sin_family = AF_INET;
-	address.sin_addr.s_addr = INADDR_ANY;
-	address.sin_port = htons(PORT);
+	free_configs(configs, config_nr);
 
-	if (bind(fd, (struct sockaddr*) &address, sizeof(address)) < 0) {
-		fprintf(stderr, "error: failed to bind socket (%d): %s\n", fd, strerror(errno));
-		return 1;
-	}
-
-	if (listen(fd, BACKLOG) < 0) {
-		fprintf(stderr, "error: failed to listen on socket (%d): %s\n", fd, strerror(errno));
-		return 1;
-	}
-
-	ret = minhttp(fd);
-
-	close(fd);
-
-	return ret;
+	return 0;
 }

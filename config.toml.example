@@ -1,0 +1,12 @@
+
+[[server]]
+name = "example"
+port = 80
+root = "/var/www"
+host = "www.example.com"
+logfile = "example.log"
+backlog = 32
+keyfile = "key.pem"
+certfile = "cert.pem"
+threads = 8
+
