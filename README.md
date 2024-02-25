@@ -25,3 +25,9 @@ name = "workgroup"
 host = "www.workgroup.com"
 root = "/var/workgroup"
 ```
+
+# Running
+
+You run the server using `./minhttp`.
+
+To change which file the server uses for its configuration, you can use the `-C <file>` flag. To run it as a daemon, pass the `-d` flag.
