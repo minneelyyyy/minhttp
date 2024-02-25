@@ -29,13 +29,14 @@ root = "/var/workgroup"
 List of options supported:
 | Option | Type | Default | Descrption |
 | ------ | ---- | ------- | ---------- |
-| name | string | <REQUIRED> | a unique name for the server |
+| name | string | required | a unique name for the server |
 | port | int | 80 | the port the server will run on |
-| root | string | <REQUIRED> | the root path of the website |
+| root | string | required | the root path of the website |
+| host | string | required | the hostname of the server (eg www.example.com) |
 | logfile | string | null | an optional file for the server to write log info to |
 | backlog | int | 16 | maximum number of pending awaiting connections before the server starts declining them |
-| keyfile | string | <REQUIRED FOR TLS> | the servers TLS key |
-| certfile | string | <REQUIRED FOR TLS> | the server's TLS certificate |
+| keyfile | string | null | the servers TLS key, setting this automatically implies HTTPS support |
+| certfile | string | null | the server's TLS certificate, setting this automatically implies HTTPS support |
 | threads | int | automatic | number of threads the server should use |
 
 # Running
