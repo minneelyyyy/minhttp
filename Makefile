@@ -1,5 +1,5 @@
 
-OBJS=src/main.o src/config.o src/stringutil.o
+OBJS=src/main.o src/minhttp.o src/config.o src/stringutil.o src/log.o
 LIBS=lib/tomlc99/libtoml.a
 SHARELIBS=
 
