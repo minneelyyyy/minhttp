@@ -10,7 +10,8 @@ make
 
 # Configuration
 
-There is an example configuration in `./config.toml.example`. You can rename/copy it to `config.toml`.
+There is an example configuration in `./config.toml.example`. You can rename/copy it to `config.toml`,
+then update the existing config.
 To run a second server, simply add it to the config.
 
 ```toml
