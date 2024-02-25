@@ -26,7 +26,8 @@ host = "www.workgroup.com"
 root = "/var/workgroup"
 ```
 
-List of options supported:
+## Configuration Options
+
 | Option | Type | Default | Descrption |
 | ------ | ---- | ------- | ---------- |
 | name | string | required | a unique name for the server |
