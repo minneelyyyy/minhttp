@@ -66,7 +66,7 @@ static int proxy_poll(struct server_manage_info *servers, size_t server_cnt,
 		}
 
 		/* clients connected directly to the proxy */
-		for (i = socket_cnt; i < socket_cnt + clients * 2; i++) {
+		for (i = socket_cnt; i < socket_cnt + clients * 2; i += 2) {
 		}
 	}
 
