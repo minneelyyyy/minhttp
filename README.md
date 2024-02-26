@@ -19,11 +19,14 @@ To run a second server, simply add it to the config.
 name = "example"
 host = "www.example.com"
 root = "/var/example"
+http = {}
+https = { key = "key.pem", cert = "cert.pem" }
 
 [[server]]
 name = "workgroup"
 host = "www.workgroup.com"
 root = "/var/workgroup"
+http = {}
 ```
 
 ## Configuration Options
