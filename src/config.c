@@ -1,6 +1,8 @@
 #include "config.h"
 #include "stringutil.h"
 
+#include <log.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,14 +13,27 @@
 void init_config(struct config *cfg) {
 	*cfg = (struct config) {
 		.name = NULL,
-		.port = 80,
-		.root = NULL,
 		.host = NULL,
-		.logfile = NULL,
-		.backlog = 16,
-		.keyfile = NULL,
-		.certfile = NULL,
+		.root = NULL,
+		.address = NULL,
+		.http = {
+			.enabled = 0,
+			.port = 80,
+		},
+		.https = {
+			.enabled = 0,
+			.port = 443,
+			.key = NULL,
+		},
+		.log = {
+			.level = "WARN",
+			.file = {
+				.path = NULL,
+				.level = "TRACE",
+			},
+		},
 		.threads = -1,
+		.backlog = 16,
 	};
 }
 
@@ -35,9 +50,10 @@ void cleanup_config(struct config *cfg) {
 	free(cfg->name);
 	free(cfg->root);
 	free(cfg->host);
-	free(cfg->logfile);
-	free(cfg->keyfile);
-	free(cfg->certfile);
+	free(cfg->address);
+	free(cfg->https.key);
+	free(cfg->https.cert);
+	free(cfg->log.file.path);
 }
 
 #define TABLE_REQUIRED(__table, __cfg, __elem, __T, __Ts,                      \
@@ -66,6 +82,75 @@ do {                                                                           \
 	}                                                                      \
 } while (0)
 
+#define TABLE_TABLE_OPTIONAL(__table, __cfg, __elem, __errbuf, __errbuf_sz,    \
+	__func, __lbl)                                                         \
+do {                                                                           \
+	if (toml_key_exists(__table, #__elem)) {                               \
+		toml_table_t *__tbl = toml_table_in(__table, #__elem);         \
+		if (!__tbl) {                                                  \
+			snprintf(__errbuf, __errbuf_sz, #__elem                \
+				" failed to parse");                           \
+			goto __lbl;                                            \
+		}                                                              \
+		__func(__tbl, &__cfg->__elem, __errbuf, __errbuf_sz);          \
+	}                                                                      \
+} while (0)
+
+static int configure_http_from_toml(toml_table_t *table,
+		struct config_http *cfg, char *errbuf, size_t errbuf_sz) {
+	cfg->enabled = 1;
+
+	TABLE_OPTIONAL(table, cfg, port, int, i, errbuf, errbuf_sz, cfg_err);
+
+	return 0;
+
+cfg_err:
+	return 1;
+}
+
+static int configure_https_from_toml(toml_table_t *table,
+		struct config_https *cfg, char *errbuf, size_t errbuf_sz) {
+	cfg->enabled = 1;
+
+	TABLE_OPTIONAL(table, cfg, port, int, i, errbuf, errbuf_sz, cfg_err);
+	TABLE_REQUIRED(table, cfg, key, string, s, errbuf, errbuf_sz, cfg_err);
+	TABLE_REQUIRED(table, cfg, cert, string, s, errbuf, errbuf_sz, cfg_err);
+
+	return 0;
+
+cfg_err:
+	return 1;
+}
+
+static int configure_log_file_from_toml(toml_table_t *table,
+		struct config_log_file *cfg, char *errbuf, size_t errbuf_sz) {
+
+	TABLE_REQUIRED(table, cfg, path, string, s, errbuf, errbuf_sz,
+		cfg_err);
+	TABLE_OPTIONAL(table, cfg, level, string, s, errbuf, errbuf_sz,
+		cfg_err);
+
+	return 0;
+
+cfg_err:
+	return 1;
+}
+
+static int configure_log_from_toml(toml_table_t *table,
+		struct config_log *cfg, char *errbuf, size_t errbuf_sz) {
+
+	TABLE_OPTIONAL(table, cfg, level, string, s, errbuf, errbuf_sz,
+		cfg_err);
+
+	TABLE_TABLE_OPTIONAL(table, cfg, file, errbuf, errbuf_sz,
+		configure_log_file_from_toml, cfg_err);
+
+	return 0;
+
+cfg_err:
+	return 1;
+}
+
 static int create_config_from_toml(toml_table_t *table, struct config *cfg,
 		char *errbuf, size_t errbuf_sz) {
 	toml_datum_t datum;
@@ -73,18 +158,19 @@ static int create_config_from_toml(toml_table_t *table, struct config *cfg,
 	init_config(cfg);
 
 	TABLE_REQUIRED(table, cfg, name, string, s, errbuf, errbuf_sz, cfg_err);
-	TABLE_OPTIONAL(table, cfg, port, int, i, errbuf, errbuf_sz, cfg_err);
 	TABLE_REQUIRED(table, cfg, root, string, s, errbuf, errbuf_sz, cfg_err);
 	TABLE_REQUIRED(table, cfg, host, string, s, errbuf, errbuf_sz, cfg_err);
-	TABLE_OPTIONAL(table, cfg, logfile, string, s, errbuf, errbuf_sz,
+	TABLE_OPTIONAL(table, cfg, address, string, s, errbuf, errbuf_sz,
 		cfg_err);
+	TABLE_OPTIONAL(table, cfg, threads, int, i, errbuf, errbuf_sz, cfg_err);
 	TABLE_OPTIONAL(table, cfg, backlog, int, i, errbuf, errbuf_sz, cfg_err);
-	TABLE_OPTIONAL(table, cfg, keyfile, string, s, errbuf, errbuf_sz,
-		cfg_err);
-	TABLE_OPTIONAL(table, cfg, certfile, string, s, errbuf, errbuf_sz,
-		cfg_err);
-	TABLE_OPTIONAL(table, cfg, threads, int, i, errbuf, errbuf_sz,
-		cfg_err);
+
+	TABLE_TABLE_OPTIONAL(table, cfg, http, errbuf, errbuf_sz,
+		configure_http_from_toml, cfg_err);
+	TABLE_TABLE_OPTIONAL(table, cfg, https, errbuf, errbuf_sz,
+		configure_https_from_toml, cfg_err);
+	TABLE_TABLE_OPTIONAL(table, cfg, log, errbuf, errbuf_sz,
+		configure_log_from_toml, cfg_err);
 
 	return 0;
 

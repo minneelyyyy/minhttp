@@ -1,12 +1,11 @@
 
 [[server]]
 name = "example"
-port = 80
-root = "/var/www"
 host = "www.example.com"
-logfile = "example.log"
-backlog = 32
-keyfile = "key.pem"
-certfile = "cert.pem"
+root = "/var/www"
+http = { port = 80 }
+https = { port = 443, key = "key.pem", cert = "cert.pem" }
+log = { level = "INFO", file = { path = "example.log", level = "TRACE" } }
 threads = 8
+backlog = 16
 

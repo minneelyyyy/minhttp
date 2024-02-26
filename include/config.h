@@ -4,32 +4,62 @@
 #include <stddef.h>
 
 struct config {
-	/* the name of the server */
+	/** the server's name */
 	char *name;
 
-	/* the port the server runs on */
-	unsigned short port;
-
-	/* the root directory of the web server, where it serves files from */
-	char *root;
-
-	/* the host name of the server (eg. www.example.com) */
+	/** the host address of the server */
 	char *host;
 
-	/* file to write log messages to */
-	char *logfile;
+	/** the root filesystem of the server */
+	char *root;
 
-	/* maximum number of clients awaiting connection */
-	int backlog;
+	/** the local address to listen on */
+	char *address;
 
-	/* key file used for encryption */
-	char *keyfile;
+	/** http options */
+	struct config_http {
+		/** 1 if http is enabled */
+		int enabled;
 
-	/* cert file used for encryption */
-	char *certfile;
+		/** port to accept http connections on */
+		unsigned short port;
+	} http;
 
-	/* worker thread count */ 
+	/** https options */
+	struct config_https {
+		/** 1 if https is enabled */
+		int enabled;
+
+		/** port to accept https connections on */
+		unsigned short port;
+
+		/** filepath to the server's TLS key */
+		char *key;
+
+		/** filepath to the server's TLS certificate */
+		char *cert;
+	} https;
+
+	/** logging options */
+	struct config_log {
+		/** level to log to stdout at */
+		char *level;
+
+		/** file to log to */
+		struct config_log_file {
+			/** filepath of the file */
+			char *path;
+
+			/** level to log to log file at */
+			char *level;
+		} file;
+	} log;
+
+	/** number of worker threads */
 	int threads;
+
+	/** number of connections to let pend */
+	int backlog;
 };
 
 void init_config(struct config *cfg);
