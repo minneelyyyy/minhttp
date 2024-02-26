@@ -40,6 +40,11 @@ root = "/var/workgroup"
 | https.port | int | 443 | the port to run https on |
 | https.key | string | required | the server's TLS key |
 | https.cert | string | required | the server's TLS cert |
+| log | table | { level = "WARN" } | logging configuration for the server |
+| log.level | string | "WARN" | level to log at |
+| log.file | table | null | file to log to |
+| log.file.path | string | required | path of log file |
+| log.file.level | string | "INFO" | log level for log file |
 | threads | int | automatic | the number of worker threads the server will use |
 | backlog | int | 0 | the maximum number of pending connections before it declines. 0 means an implementation defined minimum. |
 
