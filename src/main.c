@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
 	char *config_path = NULL;
 	struct config *configs = NULL;
 	size_t config_nr;
-	int c;
+	int c, ret;
 	int is_daemon = 0;
 
 	while ((c = getopt(argc, argv, "dC:")) != -1) {
@@ -59,9 +59,9 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	return minhttp_proxy(configs, config_nr);
+	ret = minhttp_proxy(configs, config_nr);
 
 	free_configs(configs, config_nr);
 
-	return 0;
+	return ret;
 }
