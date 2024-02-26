@@ -155,8 +155,6 @@ cfg_err:
 
 static int create_config_from_toml(toml_table_t *table, struct config *cfg,
 		char *errbuf, size_t errbuf_sz) {
-	toml_datum_t datum;
-
 	init_config(cfg);
 
 	TABLE_REQUIRED(table, cfg, name, string, s, errbuf, errbuf_sz, cfg_err);
