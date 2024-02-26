@@ -6,7 +6,6 @@
 struct server {
 	struct config *cfg;
 	struct sockaddr_in addr;
-	int socket;
 };
 
 int server_entry(struct server *srv);

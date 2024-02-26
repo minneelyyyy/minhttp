@@ -9,25 +9,52 @@
 
 int server_entry(struct server *srv) {
 	FILE *logfile = NULL;
+	int sock;
+	int level;
 
-	if (srv->cfg->logfile) {
-		logfile = fopen(srv->cfg->logfile, "w");
+	level = log_level_from_string(srv->cfg->log.level);
+
+	if (level == -1) {
+		log_warn("failed to get log level, setting default WARN");
+		level = LOG_WARN;
+	}
+
+	log_set_level(level);
+
+	if (srv->cfg->log.file.path) {
+		logfile = fopen(srv->cfg->log.file.path, "w");
 
 		if (!logfile) {
 			log_warn("failed to open log file '%s' for writing",
-				srv->cfg->logfile);
+				srv->cfg->log.file.path);
 		} else {
-			log_add_fp(logfile, LOG_INFO);
+			level = log_level_from_string(
+				srv->cfg->log.file.level);
+
+			if (level == -1) {
+				log_warn( "failed to get log level"
+					" for file, setting INFO");
+				level = LOG_INFO;
+			}
+
+			log_add_fp(logfile, level);
 		}
 	}
 
-	if (bind(srv->socket, (struct sockaddr*) &srv->addr,
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+
+	if (sock < 0) {
+		log_error("failed to create socket");
+		return 1;
+	}
+
+	if (bind(sock, (struct sockaddr*) &srv->addr,
 				sizeof(srv->addr))) {
 		log_error("failed to bind");
 		return 1;
 	}
 
-	if (listen(srv->socket, srv->cfg->backlog)) {
+	if (listen(sock, srv->cfg->backlog)) {
 		log_error("failed to listen on socket");
 		return 1;
 	}
