@@ -15,7 +15,7 @@ void init_config(struct config *cfg) {
 		.name = NULL,
 		.host = NULL,
 		.root = NULL,
-		.address = NULL,
+		.address = "127.0.0.1",
 		.http = {
 			.enabled = 0,
 			.port = 80,
@@ -53,7 +53,9 @@ void cleanup_config(struct config *cfg) {
 	free(cfg->address);
 	free(cfg->https.key);
 	free(cfg->https.cert);
+	free(cfg->log.level);
 	free(cfg->log.file.path);
+	free(cfg->log.file.level);
 }
 
 #define TABLE_REQUIRED(__table, __cfg, __elem, __T, __Ts,                      \

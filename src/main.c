@@ -1,6 +1,9 @@
 #define _XOPEN_SOURCE 500
 
 #include <config.h>
+#include "proxy.h"
+
+#include <log.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,14 +14,11 @@
 #include <netinet/in.h>
 #include <unistd.h>
 
-extern int server_start(struct config *cfg, int socket);
-
 static void daemonize(void) {
 	pid_t pid = fork();
 
 	if (pid < 0) {
-		fprintf(stderr, "error: failed to daemonize: %s\n",
-			strerror(errno));
+		log_error("failed to daemonize: %s", strerror(errno));
 		exit(1);
 	}
 
@@ -56,24 +56,11 @@ int main(int argc, char **argv) {
 	free(config_path);
 
 	if (!configs) {
-		fprintf(stderr, "error: failed to parse config: %s\n", errbuf);
+		log_error("failed to parse config: %s", errbuf);
 		return 1;
 	}
 
-	for (size_t i = 0; i < config_nr; i++) {
-		struct config *cfg = &configs[i];
-
-		pid = fork();
-
-		if (pid == -1) {
-			fprintf(stderr, "error: failed to fork process: %s\n",
-				strerror(errno));
-			return 1;
-		}
-
-		if (!pid)
-			return server_start(cfg);
-	}
+	return minhttp_proxy(configs, config_nr);
 
 	free_configs(configs, config_nr);
 
