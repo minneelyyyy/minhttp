@@ -98,7 +98,7 @@ const char* log_level_string(int level) {
 
 
 int log_level_from_string(const char *string) {
-  for (int i = 0; i < sizeof(level_strings) / sizeof(level_strings[0]); i++) {
+  for (size_t i = 0; i < sizeof(level_strings) / sizeof(level_strings[0]); i++) {
     if (!strcmp(level_strings[i], string))
       return i;
   }
@@ -123,7 +123,7 @@ void log_set_quiet(bool enable) {
 
 
 int log_add_callback(log_LogFn fn, void *udata, int level) {
-  for (int i = 0; i < MAX_CALLBACKS; i++) {
+  for (size_t i = 0; i < MAX_CALLBACKS; i++) {
     if (!L.callbacks[i].fn) {
       L.callbacks[i] = (Callback) { fn, udata, level };
       return 0;
@@ -164,7 +164,7 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
     va_end(ev.ap);
   }
 
-  for (int i = 0; i < MAX_CALLBACKS && L.callbacks[i].fn; i++) {
+  for (size_t i = 0; i < MAX_CALLBACKS && L.callbacks[i].fn; i++) {
     Callback *cb = &L.callbacks[i];
     if (level >= cb->level) {
       init_event(&ev, cb->udata);
