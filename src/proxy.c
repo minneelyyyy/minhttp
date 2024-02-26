@@ -50,7 +50,7 @@ static int proxy_poll(struct server_manage_info *servers, size_t server_cnt,
 	return 0;
 }
 
-int port_already_exists(struct socket_info *sockets, size_t socket_cnt,
+static int port_already_exists(struct socket_info *sockets, size_t socket_cnt,
 		unsigned short port) {
 	size_t i;
 
