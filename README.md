@@ -33,15 +33,18 @@ root = "/var/workgroup"
 | name | string | required | a unique name for the server |
 | port | int | 80 | the port the server will run on |
 | root | string | required | the root path of the website |
-| host | string | required | the hostname of the server (eg www.example.com) |
-| logfile | string | null | an optional file for the server to write log info to |
-| backlog | int | 16 | maximum number of pending awaiting connections before the server starts declining them |
-| keyfile | string | null | the servers TLS key, setting this automatically implies HTTPS support |
-| certfile | string | null | the server's TLS certificate, setting this automatically implies HTTPS support |
-| threads | int | automatic | number of threads the server should use |
+| address | string | 127.0.0.1 | local address that the sever will run on |
+| http | table | null | if set, http will be enabled |
+| http.port | int | 80 | the port to run http on |
+| https | table | null | if set, https will be enabled |
+| https.port | int | 443 | the port to run https on |
+| https.key | string | required | the server's TLS key |
+| https.cert | string | required | the server's TLS cert |
+| threads | int | automatic | the number of worker threads the server will use |
+| backlog | int | 0 | the maximum number of pending connections before it declines. 0 means an implementation defined minimum. |
 
 # Running
 
-You run the server using `./minhttp`.
+You can run the server using `./minhttp`.
 
 To change which file the server uses for its configuration, you can use the `-C <file>` flag. To run it as a daemon, pass the `-d` flag.
