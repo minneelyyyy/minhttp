@@ -21,6 +21,7 @@
  */
 
 #include "log.h"
+#include <string.h>
 
 #define MAX_CALLBACKS 32
 
@@ -93,6 +94,15 @@ static void unlock(void) {
 
 const char* log_level_string(int level) {
   return level_strings[level];
+}
+
+
+int log_level_from_string(const char *string) {
+  for (int i = 0; i < sizeof(level_strings) / sizeof(level_strings[0]); i++) {
+    if (!strcmp(level_strings[i], string))
+      return i;
+  }
+  return -1;
 }
 
 
