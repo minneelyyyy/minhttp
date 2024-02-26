@@ -47,6 +47,31 @@ static int create_http_socket(struct config *cfg) {
 
 static int proxy_poll(struct server_manage_info *servers, size_t server_cnt,
 		struct socket_info *sockets, size_t socket_cnt) {
+	nfds_t cfds = socket_cnt;
+	nfds_t nfds = socket_cnt;
+	size_t clients = 0;
+	struct pollfd *pfds = malloc(sizeof(struct pollfd) * socket_cnt);
+	size_t i;
+
+	for (i = 0; i < socket_cnt; i++) {
+		pfds[i].fd = sockets[i].fd;
+		pfds[i].events = POLLIN | POLLOUT;
+	}
+
+	for (;;) {
+		int ready = poll(pfds, nfds, -1);
+
+		/* sockets accept connections on */
+		for (i = 0; i < socket_cnt; i++) {
+		}
+
+		/* clients connected directly to the proxy */
+		for (i = socket_cnt; i < socket_cnt + clients * 2; i++) {
+		}
+	}
+
+	free(pfds);
+
 	return 0;
 }
 
@@ -145,6 +170,10 @@ int minhttp_proxy(struct config *server_cfgs, size_t server_cnt) {
 	}
 
 	proxy_poll(servers, server_cnt, sockets, socket_cnt);
+
+	for (i = 0; i < server_cnt; i++) {
+		close(sockets[i].fd);
+	}
 
 cleanup:
 	free(servers);
