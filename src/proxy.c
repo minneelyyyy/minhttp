@@ -16,20 +16,21 @@
 
 struct server_manage_info {
 	struct server srv;
-	int httpfd;
+};
+
+struct socket_info {
+	struct sockaddr_in addr;
+	int fd;
 };
 
 static int create_http_socket(struct config *cfg) {
 	int fd;
-	int opt = 1;
 	struct sockaddr_in addr;
 
 	fd = socket(AF_INET, SOCK_STREAM, 0);
 
 	if (!fd) 
 		return 1;
-
-	setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
 
 	if (listen(fd, cfg->backlog))
 		return 1;
@@ -44,20 +45,47 @@ static int create_http_socket(struct config *cfg) {
 	return fd;
 }
 
-static int proxy_poll(struct server_manage_info *servers, size_t server_cnt) {
+static int proxy_poll(struct server_manage_info *servers, size_t server_cnt,
+		struct socket_info *sockets, size_t socket_cnt) {
+	return 0;
+}
+
+int port_already_exists(struct socket_info *sockets, size_t socket_cnt,
+		unsigned short port) {
+	size_t i;
+
+	for (i = 0; i < socket_cnt; i++) {
+		if (sockets[i].addr.sin_port == htons(port))
+			return 1;
+	}
+
 	return 0;
 }
 
 int minhttp_proxy(struct config *server_cfgs, size_t server_cnt) {
-	size_t i, client_cnt = 0;
+	size_t i;
+	int err = 0;
 	struct server_manage_info *servers =
 		malloc(sizeof(struct server_manage_info) * server_cnt);
 
-	if (!servers) {
+	/* the maximum number of sockets possible is 1* for each server.
+	 * it can also be less, but it isn't worth saving the few bytes
+	 * this struct costs to store for the downside of making this more
+	 * complicated.
+	 * 
+	 * *1 because the server doesnt support https yet. there will
+	 *   eventually be a need for more sockets per server. */
+	struct socket_info *sockets =
+		malloc(sizeof(struct socket_info) * server_cnt);
+	size_t socket_cnt = 0;
+
+	if (!servers || !sockets) {
 		log_error("out of memory");
 		return 1;
 	}
 
+	/* setup child procs first. this gives them time to do their setup
+	 * without waiting for the proxy server to setup. */
 	for (i = 0; i < server_cnt; i++) {
 		struct config *cfg = &server_cfgs[i];
 		unsigned short fake_port = 8000 + i;
@@ -67,38 +95,9 @@ int minhttp_proxy(struct config *server_cfgs, size_t server_cnt) {
 
 		servers[i].srv.cfg = cfg;
 
-		fd = socket(AF_INET, SOCK_STREAM, 0);
-
-		if (fd < 0) {
-			log_error("failed to open socket: %s", strerror(errno));
-			free(servers);
-			return 1;
-		}
-
-		servers[i].srv.socket = fd;
-
 		servers[i].srv.addr.sin_family = AF_INET;
 		servers[i].srv.addr.sin_port = htons(fake_port);
 		inet_aton(cfg->address, &servers[i].srv.addr.sin_addr);
-
-		servers[i].httpfd = -1;
-
-		if (cfg->http.enabled) {
-			servers[i].httpfd = create_http_socket(cfg);
-
-			if (!servers[i].httpfd) {
-				log_error("failed to open socket: %s",
-					strerror(errno));
-				free(servers);
-				return 1;
-			}
-		}
-
-		if (cfg->https.enabled) {
-			log_fatal("https is not yet supported");
-			free(servers);
-			return 1;
-		}
 
 		pid = fork();
 
@@ -106,17 +105,50 @@ int minhttp_proxy(struct config *server_cfgs, size_t server_cnt) {
 			log_error("failed to fork process: %s\n",
 				strerror(errno));
 
-			free(servers);
-			return 1;
+			err = 1;
+			goto cleanup;
 		}
 
 		if (!pid) {
-			int ret = server_entry(&servers[i].srv);
-			free(servers);
-			return ret;
+			err = server_entry(&servers[i].srv);
+			goto cleanup;
 		}
 	}
 
+	/* setup the proxy server */
+	for (i = 0; i < server_cnt; i++) {
+		struct config *cfg = &server_cfgs[i];
+
+		/* sets up a net-facing socket for the proxy for http */
+		if (cfg->http.enabled && !port_already_exists(sockets,
+						socket_cnt, cfg->http.port)) {
+			sockets[socket_cnt].fd = create_http_socket(cfg);
+
+			if (!sockets[socket_cnt].fd) {
+				log_error("failed to open socket: %s",
+					strerror(errno));
+
+				err = 1;
+				goto cleanup;
+			}
+
+			sockets[socket_cnt].addr = servers[i].srv.addr;
+			socket_cnt++;
+		}
+
+		/* same thing for https */
+		if (cfg->https.enabled) {
+			log_fatal("https is not yet supported");
+			err = 1;
+			goto cleanup;
+		}
+	}
+
+	proxy_poll(servers, server_cnt, sockets, socket_cnt);
+
+cleanup:
 	free(servers);
-	return 0;
+	free(sockets);
+
+	return err;
 }
