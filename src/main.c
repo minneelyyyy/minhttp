@@ -31,7 +31,6 @@ int main(int argc, char **argv) {
 	char *config_path = NULL;
 	struct config *configs = NULL;
 	size_t config_nr;
-	pid_t pid;
 	int c;
 	int is_daemon = 0;
 
