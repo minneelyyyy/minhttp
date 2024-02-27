@@ -7,8 +7,11 @@
 #include <string.h>
 #include <errno.h>
 
+#include <unistd.h>
+
 int server_entry(struct server *srv) {
 	FILE *logfile = NULL;
+	int opt = 1;
 	int sock;
 	int level;
 
@@ -46,22 +49,37 @@ int server_entry(struct server *srv) {
 	sock = socket(AF_INET, SOCK_STREAM, 0);
 
 	if (sock < 0) {
-		log_error("failed to create socket");
+		log_error("failed to create socket: %s", strerror(errno));
+		return 1;
+	}
+
+	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+		log_error("failed to set socket option REUSEADDR: %s", strerror(errno));
 		return 1;
 	}
 
 	if (bind(sock, (struct sockaddr*) &srv->addr,
 				sizeof(srv->addr))) {
-		log_error("failed to bind");
+		log_error("failed to bind: %s", strerror(errno));
 		return 1;
 	}
 
 	if (listen(sock, srv->cfg->backlog)) {
-		log_error("failed to listen on socket");
+		log_error("failed to listen on socket: %s", strerror(errno));
 		return 1;
 	}
 
-	/* ... */
+	for (;;) {
+		int fd = accept(sock, NULL, NULL);
+		char buffer[512];
+		ssize_t r;
+
+		while ((r = recv(fd, buffer, sizeof(buffer), 0)) > 0) {
+			send(fd, buffer, r, 0);
+		}
+
+		close(fd);
+	}
 
 	/* DANGEROUS: at this point, the logging library still holds a pointer
 	 * to this file, but we also don't want to keep it open forever.
