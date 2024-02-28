@@ -290,8 +290,41 @@ static int port_already_exists(struct socket_info *sockets, size_t socket_cnt,
 int minhttp_proxy(struct config *cfg) {
 	size_t i;
 	int err = 0;
+	FILE *logfile = NULL;
+	int level;
 	struct server_manage_info *servers =
 		malloc(sizeof(struct server_manage_info) * cfg->servers_count);
+
+	level = log_level_from_string(cfg->log.level);
+
+	if (level == -1) {
+		log_warn("failed to get log level, setting default WARN");
+		level = LOG_WARN;
+	}
+
+	log_set_level(level);
+
+	if (cfg->log.file.path) {
+		logfile = fopen(cfg->log.file.path, "w");
+
+		if (!logfile) {
+			log_warn("failed to open log file '%s' for writing",
+				cfg->log.file.path);
+			fclose(logfile);
+			logfile = NULL;
+		} else {
+			level = log_level_from_string(
+				cfg->log.file.level);
+
+			if (level == -1) {
+				log_warn( "failed to get log level"
+					" for file, setting INFO");
+				level = LOG_INFO;
+			}
+
+			log_add_fp(logfile, level);
+		}
+	}
 
 	/* the maximum number of sockets possible is 1* for each server.
 	 * it can also be less, but it isn't worth saving the few bytes
@@ -379,6 +412,9 @@ int minhttp_proxy(struct config *cfg) {
 cleanup:
 	free(servers);
 	free(sockets);
+
+	if (logfile)
+		fclose(logfile);
 
 	return err;
 }
