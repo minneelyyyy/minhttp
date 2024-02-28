@@ -28,6 +28,7 @@ struct socket_info {
 struct client_manage_info {
 	struct socket_info sock;
 	char buffer[8096];
+	size_t buffer_size, buffer_off;
 };
 
 static struct client_manage_info *get_client(
@@ -53,48 +54,98 @@ static struct client_manage_info *get_unused_client(
 	return &clients[count];
 }
 
+static void disconnect_client(struct client_manage_info *client,
+		struct pollfd *pfd) {
+	char saddr[INET_ADDRSTRLEN];
+
+	close(pfd->fd);
+
+	pfd->fd = -1;
+	client->sock.fd = -1;
+
+	inet_ntop(AF_INET, &client->sock.addr.sin_addr, saddr,
+		INET_ADDRSTRLEN);
+
+	log_info("%s disconnected", saddr);
+}
+
 /* NOTE: NOT THREAD SAFE! Will need changes if we make the proxy MT!
  * particularly, the static elements create a race condition. */
 static int client_manager(struct server_manage_info *srv,
 		size_t srv_cnt, struct pollfd *pfd) {
 	static struct client_manage_info *clients = NULL;
-	static size_t client_count = 0;
-	static size_t client_capacity = 0;
+	static size_t clients_size = 0;
+	static size_t clients_capacity = 0;
 
-	struct client_manage_info *this;
+	struct client_manage_info *client;
 	size_t i;
 
 	/* NOTE: this code assumes we only ever add one client at a 
 	 * time. if that changes, this code needs to change too. */
-	if (client_count + 1 >= client_capacity) {
-		client_capacity = client_capacity ? 8
-			: client_capacity * 2;
+	if (clients_size + 1 >= clients_capacity) {
+		clients_capacity = clients_capacity > 0
+			? clients_capacity * 2 : 8;
 
 		clients = realloc(clients,
-		    sizeof(struct client_manage_info) * client_capacity);
+		    sizeof(struct client_manage_info) * clients_capacity);
 
-		for (i = client_count; i < client_capacity; i++) {
+		for (i = clients_size; i < clients_capacity; i++) {
 			clients[i].sock.fd = -1;
+			clients[i].buffer_size = 0;
+			clients[i].buffer_off = 0;
 		}
 	}
 
-	this = get_client(clients, client_count, pfd->fd);
+	client = get_client(clients, clients_size, pfd->fd);
 
 	/* this is a client we have not seen before */
-	if (!this) {
+	if (!client) {
 		socklen_t len = sizeof(struct sockaddr_in);
-		this = get_unused_client(clients, client_count);
+		client = get_unused_client(clients, clients_size);
 
-		this->sock.fd = pfd->fd;
-		getsockname(pfd->fd, (struct sockaddr*) &this->sock.addr, &len);
+		client->sock.fd = pfd->fd;
+		getsockname(pfd->fd, (struct sockaddr*) &client->sock.addr,
+			&len);
+
+		clients_size++;
 	}
 
 	if (pfd->revents & POLLHUP) {
-		close(pfd->fd);
-		pfd->fd = -1;
-		this->sock.fd = -1;
-
+		disconnect_client(client, pfd);
 		return 0;
+	}
+
+	if ((pfd->revents & POLLIN)
+			&& client->buffer_size < sizeof(client->buffer)) {
+		ssize_t c;
+
+		c = recv(pfd->fd, client->buffer + client->buffer_size,
+			sizeof(client->buffer) - client->buffer_size
+				- client->buffer_off, 0);
+
+		if (c < 1) {
+			disconnect_client(client, pfd);
+			return 0;
+		}
+
+		client->buffer_size += c;
+	}
+
+	if ((pfd->revents & POLLOUT) && client->buffer_size > 0) {
+		ssize_t r;
+		size_t amt = client->buffer_size - client->buffer_off;
+
+		r = send(pfd->fd, client->buffer + client->buffer_off, amt, 0);
+
+		if (r < 1) {
+			log_warn("send returned <1");
+			return 0;
+		} else if (r < amt) {
+			client->buffer_off += r;
+		} else {
+			client->buffer_off = 0;
+			client->buffer_size = 0;
+		}
 	}
 
 	return 0;
@@ -103,16 +154,24 @@ static int client_manager(struct server_manage_info *srv,
 static int accept_connection(int sock, struct pollfd **pfds, nfds_t *nfds,
 		nfds_t *cfds) {
 	size_t i;
-	int con = accept(sock, NULL, NULL);
+	struct sockaddr_in addr;
+	socklen_t len = sizeof(addr);
+	char saddr[INET_ADDRSTRLEN];
+
+	int con = accept(sock, (struct sockaddr*) &addr, &len);
 
 	if (con < 0) {
 		log_warn("failed to accept new connection");
 		return 0;
 	}
 
+	inet_ntop(AF_INET, &addr.sin_addr, saddr, INET_ADDRSTRLEN);
+	log_info("connection from %s:%hu", saddr, htons(addr.sin_port));
+
 	/* try to find an unused element in pfds */
 	for (i = 0; i < *nfds; i++) {
 		if ((*pfds)[i].fd < 0) {
+			log_debug("reusing pfd %lu", i);
 			(*pfds)[i].fd = con;
 			return 0;
 		}
@@ -122,6 +181,8 @@ static int accept_connection(int sock, struct pollfd **pfds, nfds_t *nfds,
 	if (*nfds == *cfds) {
 		struct pollfd *new_pfds;
 		nfds_t new_cfds = *cfds * 2;
+
+		log_debug("resizing pfds from %lu to %lu", *cfds, new_cfds);
 
 		new_pfds = realloc(*pfds, sizeof(struct pollfd) * new_cfds);
 
@@ -137,8 +198,11 @@ static int accept_connection(int sock, struct pollfd **pfds, nfds_t *nfds,
 
 	(*pfds)[*nfds].fd = con;
 	(*pfds)[*nfds].events = POLLIN | POLLOUT;
+	(*pfds)[*nfds].revents = 0;
 
 	(*nfds)++;
+
+	log_debug("appended pollfd at end. nfds = %lu", *nfds);
 
 	return 0;
 }
@@ -156,8 +220,18 @@ static int proxy_poll(struct server_manage_info *servers, size_t server_cnt,
 		pfds[i].events = POLLIN;
 	}
 
+	log_info("ready to accept connections on proxy");
+
 	for (;;) {
 		int ready = poll(pfds, nfds, -1);
+
+		/* clients connected directly to the proxy */
+		for (i = socket_cnt; i < nfds; i++) {
+			ret = client_manager(servers, server_cnt, &pfds[i]);
+
+			if (ret)
+				goto err;
+		}
 
 		/* sockets to accept connections on */
 		for (i = 0; i < socket_cnt; i++) {
@@ -169,14 +243,6 @@ static int proxy_poll(struct server_manage_info *servers, size_t server_cnt,
 					goto err;
 			}
 		}
-
-		/* clients connected directly to the proxy */
-		for (i = socket_cnt; i < nfds; i++) {
-			ret = client_manager(servers, server_cnt, &pfds[i]);
-
-			if (ret)
-				goto err;
-		}
 	}
 
 err:
@@ -187,11 +253,14 @@ err:
 static int create_http_socket(struct config *cfg) {
 	int fd;
 	struct sockaddr_in addr;
+	int opt = 1;
 
 	fd = socket(AF_INET, SOCK_STREAM, 0);
 
 	if (!fd) 
 		return 1;
+
+	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(cfg->http.port);
