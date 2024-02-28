@@ -252,9 +252,11 @@ struct config *parse_config(const char *config_file_path,
 		}
 	}
 
-	configure_log_from_toml(toml, &cfg->log, errbuf, errbuf_sz);
+	TABLE_TABLE_OPTIONAL(toml, cfg, log, errbuf, errbuf_sz,
+		configure_log_from_toml, cfg_err);
 
 	toml_free(toml);
 
+cfg_err:
 	return cfg;
 }
