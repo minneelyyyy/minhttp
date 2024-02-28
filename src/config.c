@@ -222,6 +222,14 @@ struct config *parse_config(const char *config_file_path,
 		return NULL;
 	}
 
+	cfg->log = (struct config_log) {
+		.level = "WARN",
+		.file = {
+			.level = "INFO",
+			.path = NULL,
+		},
+	};
+
 	cfg->servers_count = toml_array_nelem(servers);
 	cfg->servers = malloc(sizeof(struct server_config) * cfg->servers_count);
 
