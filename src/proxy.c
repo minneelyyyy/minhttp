@@ -250,7 +250,7 @@ err:
 	return ret;
 }
 
-static int create_http_socket(struct config *cfg) {
+static int create_http_socket(struct server_config *cfg) {
 	int fd;
 	struct sockaddr_in addr;
 	int opt = 1;
@@ -287,11 +287,11 @@ static int port_already_exists(struct socket_info *sockets, size_t socket_cnt,
 	return 0;
 }
 
-int minhttp_proxy(struct config *server_cfgs, size_t server_cnt) {
+int minhttp_proxy(struct config *cfg) {
 	size_t i;
 	int err = 0;
 	struct server_manage_info *servers =
-		malloc(sizeof(struct server_manage_info) * server_cnt);
+		malloc(sizeof(struct server_manage_info) * cfg->servers_count);
 
 	/* the maximum number of sockets possible is 1* for each server.
 	 * it can also be less, but it isn't worth saving the few bytes
@@ -301,7 +301,7 @@ int minhttp_proxy(struct config *server_cfgs, size_t server_cnt) {
 	 * *1 because the server doesnt support https yet. there will
 	 *   eventually be a need for more sockets per server. */
 	struct socket_info *sockets =
-		malloc(sizeof(struct socket_info) * server_cnt);
+		malloc(sizeof(struct socket_info) * cfg->servers_count);
 	size_t socket_cnt = 0;
 
 	if (!servers || !sockets) {
@@ -311,18 +311,18 @@ int minhttp_proxy(struct config *server_cfgs, size_t server_cnt) {
 
 	/* setup child procs first. this gives them time to do their setup
 	 * without waiting for the proxy server to setup. */
-	for (i = 0; i < server_cnt; i++) {
-		struct config *cfg = &server_cfgs[i];
+	for (i = 0; i < cfg->servers_count; i++) {
+		struct server_config *scfg = &cfg->servers[i];
 		unsigned short fake_port = 8000 + i;
 
 		pid_t pid;
 		int fd;
 
-		servers[i].srv.cfg = cfg;
+		servers[i].srv.cfg = scfg;
 
 		servers[i].srv.addr.sin_family = AF_INET;
 		servers[i].srv.addr.sin_port = htons(fake_port);
-		inet_aton(cfg->address, &servers[i].srv.addr.sin_addr);
+		inet_aton(scfg->address, &servers[i].srv.addr.sin_addr);
 
 		pid = fork();
 
@@ -342,13 +342,13 @@ int minhttp_proxy(struct config *server_cfgs, size_t server_cnt) {
 	}
 
 	/* setup the proxy server */
-	for (i = 0; i < server_cnt; i++) {
-		struct config *cfg = &server_cfgs[i];
+	for (i = 0; i < cfg->servers_count; i++) {
+		struct server_config *scfg = &cfg->servers[i];
 
 		/* sets up a net-facing socket for the proxy for http */
-		if (cfg->http.enabled && !port_already_exists(sockets,
-						socket_cnt, cfg->http.port)) {
-			sockets[socket_cnt].fd = create_http_socket(cfg);
+		if (scfg->http.enabled && !port_already_exists(sockets,
+						socket_cnt, scfg->http.port)) {
+			sockets[socket_cnt].fd = create_http_socket(scfg);
 
 			if (!sockets[socket_cnt].fd) {
 				log_error("failed to open socket: %s",
@@ -363,16 +363,16 @@ int minhttp_proxy(struct config *server_cfgs, size_t server_cnt) {
 		}
 
 		/* same thing for https */
-		if (cfg->https.enabled) {
+		if (scfg->https.enabled) {
 			log_fatal("https is not yet supported");
 			err = 1;
 			goto cleanup;
 		}
 	}
 
-	proxy_poll(servers, server_cnt, sockets, socket_cnt);
+	proxy_poll(servers, cfg->servers_count, sockets, socket_cnt);
 
-	for (i = 0; i < server_cnt; i++) {
+	for (i = 0; i < cfg->servers_count; i++) {
 		close(sockets[i].fd);
 	}
 

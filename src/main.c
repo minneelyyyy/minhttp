@@ -29,8 +29,7 @@ static void daemonize(void) {
 int main(int argc, char **argv) {
 	char errbuf[512];
 	char *config_path = NULL;
-	struct config *configs = NULL;
-	size_t config_nr;
+	struct config *cfg = NULL;
 	int c, ret;
 	int is_daemon = 0;
 
@@ -48,20 +47,20 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	configs = parse_config(
+	cfg = parse_config(
 		config_path ? config_path : "config.toml",
-		&config_nr, errbuf, sizeof(errbuf));
+		errbuf, sizeof(errbuf));
 
 	free(config_path);
 
-	if (!configs) {
+	if (!cfg) {
 		log_error("failed to parse config: %s", errbuf);
 		return 1;
 	}
 
-	ret = minhttp_proxy(configs, config_nr);
+	ret = minhttp_proxy(cfg);
 
-	free_configs(configs, config_nr);
+	free_config(cfg);
 
 	return ret;
 }

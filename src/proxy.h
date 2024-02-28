@@ -7,6 +7,6 @@
 
 /** entry point to the proxy server that manages all servers, post configuration parsing.
  */
-int minhttp_proxy(struct config *server_cfgs, size_t server_cnt);
+int minhttp_proxy(struct config *cfg);
 
 #endif /* __MINHTTP_H */

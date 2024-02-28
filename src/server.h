@@ -4,7 +4,7 @@
 #include <netinet/in.h>
 
 struct server {
-	struct config *cfg;
+	struct server_config *cfg;
 	struct sockaddr_in addr;
 };
 
