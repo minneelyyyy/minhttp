@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-struct config {
+struct server_config {
 	/** the server's name */
 	char *name;
 
@@ -62,18 +62,23 @@ struct config {
 	int backlog;
 };
 
-void init_config(struct config *cfg);
+struct config {
+	struct config_log log;
+	struct server_config *servers;
+	size_t servers_count;
+};
 
-void cleanup_config(struct config *cfg);
+void init_server_config(struct server_config *cfg);
 
-void free_configs(struct config *cfgs, size_t count);
+void cleanup_server_config(struct server_config *cfg);
+
+void free_config(struct config *cfg);
 
 /** parse a config file written in toml
  * @param config_file_path the file to parse
- * @param count writes the number of configs to this argument (should be the number of servers)
  * @param errbuf buffer to write an error string to
  * @param errbuf_sz size of errbuf in bytes
  * @return a pointer to an array of config structs */
-struct config *parse_config(const char *config_file_path, size_t *count, char *errbuf, size_t errbuf_sz);
+struct config *parse_config(const char *config_file_path, char *errbuf, size_t errbuf_sz);
 
 #endif /* __MINHTTP_CONFIG_H */
