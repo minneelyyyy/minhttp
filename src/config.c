@@ -15,7 +15,7 @@ void init_server_config(struct server_config *cfg) {
 		.name = NULL,
 		.host = NULL,
 		.root = NULL,
-		.address = strdup("127.0.0.1"),
+		.address = NULL,
 		.http = {
 			.enabled = 0,
 			.port = 80,
@@ -26,10 +26,10 @@ void init_server_config(struct server_config *cfg) {
 			.key = NULL,
 		},
 		.log = {
-			.level = strdup("WARN"),
+			.level = NULL,
 			.file = {
 				.path = NULL,
-				.level = strdup("TRACE"),
+				.level = NULL,
 			},
 		},
 		.threads = -1,
@@ -179,6 +179,15 @@ static int create_server_config_from_toml(toml_table_t *table,
 		configure_https_from_toml, cfg_err);
 	TABLE_TABLE_OPTIONAL(table, cfg, log, errbuf, errbuf_sz,
 		configure_log_from_toml, cfg_err);
+
+	if (!cfg->address)
+		cfg->address = strdup("127.0.0.1");
+
+	if (!cfg->log.level)
+		cfg->log.level = strdup("WARN");
+
+	if (!cfg->log.file.level)
+		cfg->log.file.level = strdup("INFO");
 
 	return 0;
 
