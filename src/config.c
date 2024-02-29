@@ -182,7 +182,6 @@ cfg_err:
 
 static int create_server_config_from_toml(toml_table_t *table,
 		struct server_config *cfg, char *errbuf, size_t errbuf_sz) {
-	init_server_config(cfg);
 
 	TABLE_REQUIRED(table, cfg, name, string, s, errbuf, errbuf_sz, cfg_err);
 	TABLE_REQUIRED(table, cfg, root, string, s, errbuf, errbuf_sz, cfg_err);
