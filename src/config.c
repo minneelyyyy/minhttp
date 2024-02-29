@@ -37,8 +37,25 @@ void init_server_config(struct server_config *cfg) {
 	};
 }
 
+void init_config(struct config *cfg) {
+	*cfg = (struct config) {
+		.log = {
+			.level = NULL,
+			.file = {
+				.path = NULL,
+				.level = NULL,
+			}
+		},
+		.servers = NULL,
+		.servers_count = 0,
+	};
+}
+
 void free_config(struct config *cfg) {
 	size_t i;
+
+	if (!cfg)
+		return;
 
 	if (cfg->servers) {
 		for (i = 0; i < cfg->servers_count; i++)
@@ -220,6 +237,15 @@ struct config *parse_config(const char *config_file_path,
 	if (!toml)
 		return NULL;
 
+	cfg = malloc(sizeof(struct config));
+
+	if (!cfg) {
+		snprintf(errbuf, errbuf_sz, "out of memory");
+		goto cfg_err;
+	}
+
+	init_config(cfg);
+
 	servers = toml_array_in(toml, "server");
 
 	if (!servers) {
@@ -228,21 +254,6 @@ struct config *parse_config(const char *config_file_path,
 			" server definition");
 		goto cfg_err;
 	}
-
-	cfg = malloc(sizeof(struct config));
-
-	if (!cfg) {
-		snprintf(errbuf, errbuf_sz, "out of memory");
-		goto cfg_err;
-	}
-
-	cfg->log = (struct config_log) {
-		.level = NULL,
-		.file = {
-			.level = NULL,
-			.path = NULL,
-		},
-	};
 
 	cfg->servers_count = toml_array_nelem(servers);
 	cfg->servers = malloc(sizeof(struct server_config) * cfg->servers_count);
