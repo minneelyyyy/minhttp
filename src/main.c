@@ -36,7 +36,8 @@ int main(int argc, char **argv) {
 	while ((c = getopt(argc, argv, "dC:")) != -1) {
 		switch (c) {
 			case 'C':
-				config_path = strdup(optarg);
+				if (!config_path)
+					config_path = strdup(optarg);
 				break;
 			case 'd':
 				if (!is_daemon) {
