@@ -15,7 +15,7 @@ void init_server_config(struct server_config *cfg) {
 		.name = NULL,
 		.host = NULL,
 		.root = NULL,
-		.address = "127.0.0.1",
+		.address = strdup("127.0.0.1"),
 		.http = {
 			.enabled = 0,
 			.port = 80,
@@ -26,10 +26,10 @@ void init_server_config(struct server_config *cfg) {
 			.key = NULL,
 		},
 		.log = {
-			.level = "WARN",
+			.level = strdup("WARN"),
 			.file = {
 				.path = NULL,
-				.level = "TRACE",
+				.level = strdup("TRACE"),
 			},
 		},
 		.threads = -1,
@@ -43,7 +43,11 @@ void free_config(struct config *cfg) {
 	for (i = 0; i < cfg->servers_count; i++)
 		cleanup_server_config(&cfg->servers[i]);
 
+	free(cfg->servers);
+
+	free(cfg->log.level);
 	free(cfg->log.file.path);
+	free(cfg->log.file.level);
 
 	free(cfg);
 }
@@ -96,7 +100,9 @@ do {                                                                           \
 				" failed to parse");                           \
 			goto __lbl;                                            \
 		}                                                              \
-		__func(__tbl, &__cfg->__elem, __errbuf, __errbuf_sz);          \
+		if (__func(__tbl, &__cfg->__elem, __errbuf, __errbuf_sz)) {    \
+			goto __lbl;                                            \
+		}                                                              \
 	}                                                                      \
 } while (0)
 
@@ -223,9 +229,9 @@ struct config *parse_config(const char *config_file_path,
 	}
 
 	cfg->log = (struct config_log) {
-		.level = "WARN",
+		.level = NULL,
 		.file = {
-			.level = "INFO",
+			.level = NULL,
 			.path = NULL,
 		},
 	};
@@ -255,8 +261,18 @@ struct config *parse_config(const char *config_file_path,
 	TABLE_TABLE_OPTIONAL(toml, cfg, log, errbuf, errbuf_sz,
 		configure_log_from_toml, cfg_err);
 
+	if (cfg->log.level == NULL)
+		cfg->log.level = strdup("WARN");
+
+	if (cfg->log.file.level == NULL)
+		cfg->log.file.level = strdup("INFO");
+
 	toml_free(toml);
+	return cfg;
 
 cfg_err:
-	return cfg;
+	toml_free(toml);
+	free_config(cfg);
+
+	return NULL;
 }
