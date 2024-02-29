@@ -295,6 +295,11 @@ int minhttp_proxy(struct config *cfg) {
 	struct server_manage_info *servers =
 		malloc(sizeof(struct server_manage_info) * cfg->servers_count);
 
+	if (!servers) {
+		log_error("failed to allocate space for servers");
+		return 1;
+	}
+
 	level = log_level_from_string(cfg->log.level);
 
 	if (level == -1) {
@@ -310,7 +315,6 @@ int minhttp_proxy(struct config *cfg) {
 		if (!logfile) {
 			log_warn("failed to open log file '%s' for writing",
 				cfg->log.file.path);
-			fclose(logfile);
 			logfile = NULL;
 		} else {
 			level = log_level_from_string(
@@ -337,7 +341,7 @@ int minhttp_proxy(struct config *cfg) {
 		malloc(sizeof(struct socket_info) * cfg->servers_count);
 	size_t socket_cnt = 0;
 
-	if (!servers || !sockets) {
+	if (!sockets) {
 		log_error("out of memory");
 		return 1;
 	}

@@ -30,7 +30,6 @@ int server_entry(struct server *srv) {
 		if (!logfile) {
 			log_warn("failed to open log file '%s' for writing",
 				srv->cfg->log.file.path);
-			fclose(logfile);
 			logfile = NULL;
 		} else {
 			level = log_level_from_string(
