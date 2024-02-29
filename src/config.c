@@ -40,10 +40,12 @@ void init_server_config(struct server_config *cfg) {
 void free_config(struct config *cfg) {
 	size_t i;
 
-	for (i = 0; i < cfg->servers_count; i++)
-		cleanup_server_config(&cfg->servers[i]);
+	if (cfg->servers) {
+		for (i = 0; i < cfg->servers_count; i++)
+			cleanup_server_config(&cfg->servers[i]);
 
-	free(cfg->servers);
+		free(cfg->servers);
+	}
 
 	free(cfg->log.level);
 	free(cfg->log.file.path);
@@ -192,7 +194,6 @@ static int create_server_config_from_toml(toml_table_t *table,
 	return 0;
 
 cfg_err:
-	cleanup_server_config(cfg);
 	return 1;
 }
 
@@ -225,16 +226,14 @@ struct config *parse_config(const char *config_file_path,
 		snprintf(errbuf, errbuf_sz,
 			"config is required to have at least one"
 			" server definition");
-		toml_free(toml);
-		return NULL;
+		goto cfg_err;
 	}
 
 	cfg = malloc(sizeof(struct config));
 
 	if (!cfg) {
 		snprintf(errbuf, errbuf_sz, "out of memory");
-		toml_free(toml);
-		return NULL;
+		goto cfg_err;
 	}
 
 	cfg->log = (struct config_log) {
@@ -250,9 +249,7 @@ struct config *parse_config(const char *config_file_path,
 
 	if (!cfg->servers) {
 		snprintf(errbuf, errbuf_sz, "out of memory");
-		toml_free(toml);
-		free(cfg);
-		return NULL;
+		goto cfg_err;
 	}
 
 	for (i = 0; i < cfg->servers_count; i++) {
@@ -260,23 +257,21 @@ struct config *parse_config(const char *config_file_path,
 
 		if (create_server_config_from_toml(
 				server, &cfg->servers[i], errbuf, errbuf_sz)) {
-			toml_free(toml);
-			free(cfg->servers);
-			free(cfg);
-			return NULL;
+			goto cfg_err;
 		}
 	}
 
 	TABLE_TABLE_OPTIONAL(toml, cfg, log, errbuf, errbuf_sz,
 		configure_log_from_toml, cfg_err);
 
-	if (cfg->log.level == NULL)
+	if (!cfg->log.level)
 		cfg->log.level = strdup("WARN");
 
-	if (cfg->log.file.level == NULL)
+	if (!cfg->log.file.level)
 		cfg->log.file.level = strdup("INFO");
 
 	toml_free(toml);
+
 	return cfg;
 
 cfg_err:
