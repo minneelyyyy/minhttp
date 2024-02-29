@@ -263,6 +263,9 @@ struct config *parse_config(const char *config_file_path,
 		goto cfg_err;
 	}
 
+	for (i = 0; i < cfg->servers_count; i++)
+		init_server_config(&cfg->servers[i]);
+
 	for (i = 0; i < cfg->servers_count; i++) {
 		toml_table_t *server = toml_table_at(servers, i);
 
